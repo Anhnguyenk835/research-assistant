@@ -6,11 +6,26 @@ class ParserType(str, Enum):
     """ Parser type"""
     DOCLING = "docling"
 
+class PaperBbox(BaseModel):
+    """ Represents a bounding box in a paper. """
+    l: float = Field(..., description="Left x-coordinate")
+    t: float = Field(..., description="Bottom y-coordinate")
+    r: float = Field(..., description="Right x-coordinate")
+    b: float = Field(..., description="Top y-coordinate")
+    coord_origin: str = Field(..., description="Coordinate origin, e.g., 'pdf' or 'image'")
+
+class PaperProv(BaseModel):
+    """ Represents provenance information for a paper element. """
+    page_no: int = Field(..., description="Page number where the element is located")
+    bbox: PaperBbox = Field(..., description="Bounding box of the element")
+    charspan: Optional[List[float]] = Field(None, description="Character span in the text")
+
 class PaperSection(BaseModel):
     """ Represents a section of a paper. """
-    title: str = Field(..., description="Title of the section")
+    label: str = Field(..., description="Title of the section")
     content: str = Field(..., description="Content of the section")
-    level: int = Field(default=1, description="Level of the section in the hierarchy")
+    prov: Optional[List[PaperProv]] = Field(None, description="Provenance information for the section")
+    level: Optional[int] = Field(None, description="Level of the section in the hierarchy (e.g., 1 for top-level sections)")
 
 class PaperFigure(BaseModel):
     """ Represents a figure in a paper. """
@@ -21,16 +36,15 @@ class PaperFigure(BaseModel):
 
 class PaperTable(BaseModel):
     """ Represents a table in a paper. """
-    id: str = Field(..., description="Unique identifier for the table")
-    caption: str = Field(..., description="Caption of the table")
-    # data: List[List[Union[str, float, int]]] = Field(..., description="2D list representing the table data")
-    page_number: int = Field(..., description="Page number where the table is located")
+    label: str = Field(..., description="Title or label of the table")
+    prov: List[PaperProv] = Field(..., description="Provenance information for the table")
+    content: str = Field(..., description="Content of the table in a structured format (e.g., text or Markdown)")
 
 class PdfContent(BaseModel):
     """ Represents the content extracted from a PDF. """
     sections: List[PaperSection] = Field(default_factory=list, description="List of sections in the paper")
-    figures: List[PaperFigure] = Field(default_factory=list, description="List of figures in the paper")
     tables: List[PaperTable] = Field(default_factory=list, description="List of tables in the paper")
+    figures: List[PaperFigure] = Field(default_factory=list, description="List of figures in the paper")
     raw_text: str = Field(..., description="Raw text extracted from the PDF")
     references: List[str] = Field(default_factory=list, description="List of references cited in the paper")
     parser_type: ParserType = Field(..., description="Type of parser used to extract the content")
