@@ -17,11 +17,13 @@ if __name__ == "__main__":
         # print(content.raw_text)
         # save to csv (all information of pdfContent)
         import pandas as pd
-        sections = pd.DataFrame([section.dict() for section in content.sections])
+        sections = pd.DataFrame([section.model_dump() for section in content.sections])
         sections.to_csv("parsed_pdf_section.csv", index=False)
-        tables = pd.DataFrame([table.dict() for table in content.tables])
+        tables = pd.DataFrame([table.model_dump() for table in content.tables])
         tables.to_csv("parsed_pdf_tables.csv", index=False)
-        pdf_content = pd.DataFrame([content.dict()])
+        pages = pd.DataFrame([page.model_dump() for page in content.page_info])
+        pages.to_csv("parsed_pdf_pages.csv", index=False)
+        pdf_content = pd.DataFrame([content.model_dump()])
         pdf_content.to_csv("parsed_pdf_content.csv", index=False)
     else:
         print("Failed to parse PDF.")

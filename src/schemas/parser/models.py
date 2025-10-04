@@ -40,13 +40,23 @@ class PaperTable(BaseModel):
     prov: List[PaperProv] = Field(..., description="Provenance information for the table")
     content: str = Field(..., description="Content of the table in a structured format (e.g., text or Markdown)")
 
+class PaperPageSize(BaseModel):
+    """ Represents the size of a page in a paper. """
+    width: float = Field(..., description="Width of the page")
+    height: float = Field(..., description="Height of the page")
+
+class PaperPage(BaseModel):
+    page_size: PaperPageSize = Field(..., description="Size of the page")
+    image: Optional[bytes] = Field(None, description="Image data of the page, if available")
+    page_no: int = Field(..., description="Page number")
+
 class PdfContent(BaseModel):
     """ Represents the content extracted from a PDF. """
     sections: List[PaperSection] = Field(default_factory=list, description="List of sections in the paper")
     tables: List[PaperTable] = Field(default_factory=list, description="List of tables in the paper")
     figures: List[PaperFigure] = Field(default_factory=list, description="List of figures in the paper")
     raw_text: str = Field(..., description="Raw text extracted from the PDF")
-    references: List[str] = Field(default_factory=list, description="List of references cited in the paper")
+    page_info: List[PaperPage] = Field(default_factory=list, description="List of pages with their sizes and images")
     parser_type: ParserType = Field(..., description="Type of parser used to extract the content")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata about the PDF or extraction process")
 

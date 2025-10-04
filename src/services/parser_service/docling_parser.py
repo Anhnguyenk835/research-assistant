@@ -7,7 +7,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
-from schemas.parser.models import ParserType, PaperSection, PaperFigure, PaperTable, PdfContent, PaperProv, PaperBbox
+from schemas.parser.models import ParserType, PaperSection, PaperFigure, PaperTable, PdfContent, PaperProv, PaperBbox, PaperPage, PaperPageSize
 from exceptions import PDFValidationException, PDFParsingException
 
 logger = logging.getLogger(__name__)
@@ -167,7 +167,7 @@ class DoclingParser:
                             charspan=p.charspan if hasattr(p, "charspan") else None
                         )
                     )
-                    
+
             table_df: pd.DataFrame = table.export_to_dataframe(doc=document)
 
             tables.append(
@@ -180,6 +180,26 @@ class DoclingParser:
                  
         return tables
 
+    def _extract_pages(self, document: any) -> List[PaperPage]:
+        """ Extract pages from the document structure of Docling.
+
+        Args:
+            document (any): Document object from Docling conversion result.
+        Returns:
+            List[PaperPage]: List of extracted pages.
+        """
+
+        pages: List[PaperPage] = [
+            PaperPage(
+                page_no=p.page_no,
+                page_size=PaperPageSize(width=p.size.width, height=p.size.height),
+                image=p.image if hasattr(p, "image") else None
+            )
+            for p in document.pages.values()
+        ]
+
+        return pages
+    
     async def _parse(self, file_path: Path) -> Optional[str]:
         """ Parse the PDF file and extract text content.
 
@@ -207,12 +227,15 @@ class DoclingParser:
             # --------------------------------------- extract tables -------------------------------------------
             tables = self._extract_tables(document) if self.table_extraction else []
 
+            # --------------------------------- extract pages information --------------------------------------
+            pages = self._extract_pages(document)
+
             return PdfContent(
                 sections=sections,
                 tables=tables,
-                figures=[],  # Docling does not extract figures currently
+                figures=[],  # Unable to extract figures for now
                 raw_text=document.export_to_text(),
-                references=[],  # Docling does not extract references currently
+                page_info=pages,
                 parser_type=ParserType.DOCLING,
                 metadata={
                     "source": "docling parser",
