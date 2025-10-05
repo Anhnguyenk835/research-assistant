@@ -144,7 +144,7 @@ class DoclingParser:
 
         return sections
 
-    def _extract_tables(self, document: any) -> List[PaperTable]:
+    def _extract_tables(self, document: any, sections: List[PaperSection]) -> List[PaperTable]:
         """ Extract tables from the document structure of Docling.
 
         Args:
@@ -157,6 +157,18 @@ class DoclingParser:
         tables: List[PaperTable] = []
 
         for table in document.tables:
+            caption = getattr(table, 'captions', None)
+            # get the caption of table from referenced section (raw data it is list of dict)
+            if caption:
+                captions = []
+                for cap in caption:
+                    _cref = cap.cref
+                    if _cref.startswith('#/texts'):
+                        text_id = int(_cref.split('/')[-1])  # get the text id referenced index
+                        caption_text = sections[text_id].content if text_id < len(sections) else ""
+                        captions.append(caption_text)
+                        break
+
             provs = []
             if (hasattr(table, "prov")) and table.prov:
                 for p in table.prov:
@@ -174,6 +186,7 @@ class DoclingParser:
                 PaperTable(
                     label=getattr(table, 'label', 'TABLE'),
                     prov=provs,
+                    caption=captions if captions else None,
                     content=table_df.to_markdown(index=False)  # Convert DataFrame to markdown string  
                 )
             )
@@ -225,10 +238,13 @@ class DoclingParser:
             sections = self._extract_section(document)
 
             # --------------------------------------- extract tables -------------------------------------------
-            tables = self._extract_tables(document) if self.table_extraction else []
+            tables = self._extract_tables(document, sections) if self.table_extraction else []
 
             # --------------------------------- extract pages information --------------------------------------
             pages = self._extract_pages(document)
+
+            # drop sections with label = caption, page_header, foot_note
+            sections = [sec for sec in sections if sec.label.lower() not in ["caption", "page_header", "foot_note"]]
 
             return PdfContent(
                 sections=sections,

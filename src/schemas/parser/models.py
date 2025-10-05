@@ -38,10 +38,11 @@ class PaperTable(BaseModel):
     """ Represents a table in a paper. """
     label: str = Field(..., description="Title or label of the table")
     prov: List[PaperProv] = Field(..., description="Provenance information for the table")
+    caption: Optional[List[str]] = Field(None, description="Caption of the table")
     content: str = Field(..., description="Content of the table in a structured format (e.g., text or Markdown)")
 
 class PaperPageSize(BaseModel):
-    """ Represents the size of a page in a paper. """
+    """ Represents the size of a page in a paper. User point unit, 1 point = 1/72 inch """
     width: float = Field(..., description="Width of the page")
     height: float = Field(..., description="Height of the page")
 
