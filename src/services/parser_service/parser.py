@@ -4,6 +4,7 @@ from pathlib import Path
 
 from schemas.parser.models import ParsedPaper, PdfContent, ParserType
 from services.parser_service.docling_parser import DoclingParser
+from exceptions import PDFParsingException, PDFValidationException
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,11 @@ class PDFParserService:
                 return parsed_content
             else:
                 logger.error(f"Docling parsing returned no result for {file_path.name}")
-                return None
+                raise PDFParsingException(f"Docling parsing returned no result for {file_path.name}")
+
+        except (PDFValidationException, PDFParsingException):
+            raise
             
         except Exception as e:
             logger.error(f"Error parsing PDF {file_path}: {e}")
-            return None
+            raise PDFParsingException(f"Error parsing PDF with docling {file_path}: {e}")

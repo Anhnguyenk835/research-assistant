@@ -3,30 +3,29 @@ from pathlib import Path
 from services.parser_service.parser import PDFParserService
 from schemas.parser.models import PdfContent
 
+from services.arxiv_service.instance import make_arxiv_client
+from config import get_settings
+
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
 if __name__ == "__main__":
-    parser_service = PDFParserService(max_pages=25, max_file_size_mb=5, ocr_option=True, table_extraction=True)
-    pdf_path = Path("../data_test/2402.05131v2.pdf")
+    # test arxiv service
+    arxiv_client = make_arxiv_client()
+    papers = asyncio.run(arxiv_client.fetch_papers())
+    print(f"Fetched {len(papers)} papers from arXiv.")
+
+    # save fetched pdf to data_test folder
+    for paper in papers:
+        print(f"Downloading PDF for paper: {paper.title}")
+        pdf_path = asyncio.run(arxiv_client.download_pdf(paper))
+        print(f"PDF saved to: {pdf_path}")
     
-    content = asyncio.run(parser_service.parse_pdf(pdf_path))
-    if content:
-        print("Parsed PDF Content successfully")
-        # print(content.raw_text)
-        # save to csv (all information of pdfContent)
-        import pandas as pd
-        sections = pd.DataFrame([section.model_dump() for section in content.sections])
-        sections.to_csv("parsed_pdf_section.csv", index=False)
-        tables = pd.DataFrame([table.model_dump() for table in content.tables])
-        tables.to_csv("parsed_pdf_tables.csv", index=False)
-        pages = pd.DataFrame([page.model_dump() for page in content.page_info])
-        pages.to_csv("parsed_pdf_pages.csv", index=False)
-        pdf_content = pd.DataFrame([content.model_dump()])
-        pdf_content.to_csv("parsed_pdf_content.csv", index=False)
-    else:
-        print("Failed to parse PDF.")
+
+
+
+
 
 
     # pipeline_options = PdfPipelineOptions(

@@ -1,0 +1,105 @@
+import os
+from pathlib import Path
+from typing import Optional, List, Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class BaseConfigSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8", 
+        extra="ignore",
+        frozen=True,
+        env_nested_delimiter="__",
+        case_sensitive=False
+    )
+
+class ArxivSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="ARXIV_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+    base_url: str = Field(default="https://export.arxiv.org/api/query")
+    rate_limit_delay: float = Field(default=3.0, description="Delay in seconds between API requests to respect rate limits.")
+    timeout_seconds: int = Field(default=30, description="Timeout for API requests in seconds.")
+    max_results: int = Field(default=2, description="Maximum number of results to fetch per query.")
+    search_category: str = Field(default="cs.AI", description="Default category to search in arXiv.")
+    download_max_retries: int = Field(default=3, description="Number of retries for downloading PDFs.")
+    download_retry_delay: float = Field(default=5.0, description="Delay in seconds between download retries.")
+    max_concurrent_downloads: int = Field(default=5, description="Maximum number of concurrent PDF downloads.")
+    max_concurrent_parsing: int = Field(default=3, description="Maximum number of concurrent PDF parsing operations.")
+    pdf_cache_dir: str = ".data/arxiv_pdfs"
+
+    namespace: dict = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "arxiv": "http://arxiv.org/schemas/atom",
+        "opensearch": "http://a9.com/-/spec/opensearch/1.1/"
+    }
+
+    @field_validator("pdf_cache_dir")
+    @classmethod
+    def validate_pdf_cache_dir(cls, value: str) -> str:
+        os.makedirs(value, exist_ok=True)
+        return value
+    
+
+class PDFParserSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="PARSER_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    max_pages: int = Field(default=25, description="Maximum number of pages to parse from a PDF.")
+    max_file_size_mb: int = Field(default=20, description="Maximum file size in megabytes for a PDF to be parsed.")
+    ocr_option: bool = Field(default=True, description="Whether to enable OCR for scanned PDFs.")
+    table_extraction: bool = Field(default=True, description="Whether to enable table extraction from PDFs.")
+
+
+
+class Settings(BaseConfigSettings):
+    app_version: str = "0.1.0"
+    debug: bool = True
+    environment: Literal["development", "staging", "production"] = "development"
+    service_name: str = "rag-api"
+
+    # postgres_database_url: str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
+    # postgres_echo_sql: bool = False
+    # postgres_pool_size: int = 20
+    # postgres_max_overflow: int = 0
+
+    # ollama_host: str = "http://localhost:11434"
+    # ollama_model: str = "llama3.2:1b"
+    # ollama_timeout: int = 300
+
+    # Jina AI embeddings configuration
+    # jina_api_key: str = ""
+
+    arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
+    pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings)
+    # chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
+    # opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
+    # langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
+    # redis: RedisSettings = Field(default_factory=RedisSettings)
+
+    # @field_validator("postgres_database_url")
+    # @classmethod
+    # def validate_database_url(cls, v: str) -> str:
+    #     if not (v.startswith("postgresql://") or v.startswith("postgresql+psycopg2://")):
+    #         raise ValueError("Database URL must start with 'postgresql://' or 'postgresql+psycopg2://'")
+    #     return v
+
+
+def get_settings() -> Settings:
+    return Settings()
