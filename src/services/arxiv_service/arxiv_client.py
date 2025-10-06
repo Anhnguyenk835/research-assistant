@@ -9,7 +9,7 @@ from urllib.parse import urlencode, quote
 
 import httpx
 from config import ArxivSettings, PDFParserSettings
-from schemas.arxiv.models import ArxivPaper
+from schemas.arxiv.arxiv_models import ArxivPaper
 
 logger = logging.getLogger(__name__)
 

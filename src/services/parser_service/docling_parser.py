@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import List, Optional
@@ -7,7 +8,8 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions, EasyOcrOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 
-from schemas.parser.models import ParserType, PaperSection, PaperFigure, PaperTable, PdfContent, PaperProv, PaperBbox, PaperPage, PaperPageSize
+from schemas.parser.parser_models import ParserType, PaperSection, PaperFigure, PaperTable, PdfContent, PaperProv, PaperBbox, PaperPage, PaperPageSize, ParsedPaper
+from schemas.arxiv.arxiv_models import ArxivPaper
 from exceptions import PDFValidationException, PDFParsingException
 
 logger = logging.getLogger(__name__)
@@ -104,7 +106,7 @@ class DoclingParser:
             element_label = getattr(element, 'label', None)
             if element_label:
                 # save the previous section if exists
-                if current_section and current_section.content.strip():
+                if current_section:
                     sections.append(current_section)
                 
                 # get provenance information
@@ -126,20 +128,20 @@ class DoclingParser:
                     prov=provs if provs else None,
                     level=getattr(element, 'level', None) # default to None if not exists
                 )
-            # no label, just append content to current section
+
             else:
                 if hasattr(element, 'text') and element.text:
-                    if not current_section:
-                        current_section = PaperSection(
-                            label="",
-                            content="",
-                            prov=None,
-                            level=None
-                        )
-                    current_section.content += element.text + "\n"
+                    if current_section:
+                        sections.append(current_section)
+                    current_section = PaperSection(
+                        label="",
+                        content=element.text.strip(),
+                        prov=None,
+                        level=None
+                    )
 
         # append the last section if exists
-        if current_section and current_section.content.strip():
+        if current_section:
             sections.append(current_section)
 
         return sections
@@ -213,7 +215,7 @@ class DoclingParser:
 
         return pages
     
-    async def _parse(self, file_path: Path) -> Optional[str]:
+    async def _parse(self, arxiv_data: ArxivPaper) -> Optional[ParsedPaper]:
         """ Parse the PDF file and extract text content.
 
         Args:
@@ -222,17 +224,21 @@ class DoclingParser:
             Optional[str]: Extracted text content or None if parsing fails.
         """
         # Validate PDF first
-        self._validate_pdf(file_path)
+        self._validate_pdf(Path(arxiv_data.pdf_url))
 
         # Warm up model on first use
         self._warm_up_model()
 
         # parse the document
         try:
-            result = self._converter.convert(str(file_path), max_num_pages=self.max_pages, max_file_size=self.max_file_size_bytes)
+            result = self._converter.convert(str(arxiv_data.pdf_url), max_num_pages=self.max_pages, max_file_size=self.max_file_size_bytes)
 
             # extract structure
             document = result.document
+
+            # # save document for debugging
+            # with open("debug_docling_document.json", "w", encoding="utf-8") as f:
+            #     f.write(document.model_dump_json(indent=2))
 
             # ------------------------- extract content include heading and paragraphs -------------------------
             sections = self._extract_section(document)
@@ -244,45 +250,49 @@ class DoclingParser:
             pages = self._extract_pages(document)
 
             # drop sections with label = caption, page_header, foot_note
-            sections = [sec for sec in sections if sec.label.lower() not in ["caption", "page_header", "foot_note"]]
+            # sections = [sec for sec in sections if sec.label.lower() not in ["caption", "page_header", "foot_note"]]
 
-            return PdfContent(
-                sections=sections,
-                tables=tables,
-                figures=[],  # Unable to extract figures for now
-                raw_text=document.export_to_text(),
-                page_info=pages,
-                parser_type=ParserType.DOCLING,
-                metadata={
-                    "source": "docling parser",
-                    "note": "Content extracted from PDF, metadata comes from arXiv API"
-                }
+            return ParsedPaper(
+                metadata=arxiv_data,
+                content=
+                    PdfContent(
+                    sections=sections,
+                    tables=tables,
+                    figures=[],  # Unable to extract figures for now
+                    raw_text=document.export_to_text(),
+                    page_info=pages,
+                    parser_type=ParserType.DOCLING,
+                    metadata={
+                        "source": "docling parser",
+                        "note": "Content extracted from PDF, metadata comes from arXiv API"
+                    }
+                )
             )
 
         except PDFValidationException as e:
             error_msg = str(e).lower()
             if "too large" in error_msg:
-                logger.error(f"PDF file {file_path} is too large to process: {e}. Skip processing.")
+                logger.error(f"PDF file {arxiv_data.pdf_url} is too large to process: {e}. Skip processing.")
                 return None
             elif "too many pages" in error_msg:
-                logger.error(f"PDF file {file_path} has too many pages to process: {e}. Skip processing.")
+                logger.error(f"PDF file {arxiv_data.pdf_url} has too many pages to process: {e}. Skip processing.")
                 return None
             else:
                 raise
             
         except Exception as e:
-            logger.error(f"Error parsing PDF file {file_path}: {e}")
+            logger.error(f"Error parsing PDF file {arxiv_data.pdf_url}: {e}")
             error_msg = str(e).lower()
 
             if "not valid" in error_msg:
                 logger.error("PDF appears to be corrupted or not a valid PDF file")
-                raise PDFParsingException(f"PDF appears to be corrupted or invalid: {file_path}")
+                raise PDFParsingException(f"PDF appears to be corrupted or invalid: {arxiv_data.pdf_url}")
             elif "timeout" in error_msg:
                 logger.error("PDF processing timed out - file may be too complex")
-                raise PDFParsingException(f"PDF processing timed out: {file_path}")
+                raise PDFParsingException(f"PDF processing timed out: {arxiv_data.pdf_url}")
             elif "memory" in error_msg or "ram" in error_msg:
                 logger.error("Out of memory - PDF may be too large or complex")
-                raise PDFParsingException(f"Out of memory processing PDF: {file_path}")
+                raise PDFParsingException(f"Out of memory processing PDF: {arxiv_data.pdf_url}")
             elif "max_num_pages" in error_msg or "page" in error_msg:
                 logger.error(f"PDF processing issue likely related to page limits (current limit: {self.max_pages} pages)")
                 raise PDFParsingException(

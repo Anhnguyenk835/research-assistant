@@ -2,7 +2,8 @@ import logging
 from typing import List, Optional
 from pathlib import Path
 
-from schemas.parser.models import ParsedPaper, PdfContent, ParserType
+from schemas.parser.parser_models import ParsedPaper, PdfContent, ParserType
+from schemas.arxiv.arxiv_models import ArxivPaper
 from services.parser_service.docling_parser import DoclingParser
 from exceptions import PDFParsingException, PDFValidationException
 
@@ -22,7 +23,7 @@ class PDFParserService:
         """
         self.docling_parser = DoclingParser(max_pages, max_file_size_mb, ocr_option, table_extraction)
 
-    async def parse_pdf(self, file_path: Path) -> Optional[PdfContent]:
+    async def parse_pdf(self, arxiv_data: ArxivPaper) -> Optional[ParsedPaper]:
         """ Parse the PDF file and extract its content.
 
         Args:
@@ -31,22 +32,22 @@ class PDFParserService:
             Optional[PdfContent]: Extracted content from the PDF or None if parsing failed.
         """
 
-        if not file_path.exists():
-            logger.error(f"File {file_path} does not exist.")
+        if not Path(arxiv_data.pdf_url).exists():
+            logger.error(f"File {arxiv_data.pdf_url} does not exist.")
             return None
         
         try:
-            parsed_content = await self.docling_parser._parse(file_path)
+            parsed_content = await self.docling_parser._parse(arxiv_data)
             if parsed_content:
-                logger.info(f"Successfully parsed PDF {file_path}")
+                logger.info(f"Successfully parsed PDF {arxiv_data.pdf_url}")
                 return parsed_content
             else:
-                logger.error(f"Docling parsing returned no result for {file_path.name}")
-                raise PDFParsingException(f"Docling parsing returned no result for {file_path.name}")
+                logger.error(f"Docling parsing returned no result for {arxiv_data.pdf_url.name}")
+                raise PDFParsingException(f"Docling parsing returned no result for {arxiv_data.pdf_url.name}")
 
         except (PDFValidationException, PDFParsingException):
             raise
             
         except Exception as e:
-            logger.error(f"Error parsing PDF {file_path}: {e}")
-            raise PDFParsingException(f"Error parsing PDF with docling {file_path}: {e}")
+            logger.error(f"Error parsing PDF {arxiv_data.pdf_url}: {e}")
+            raise PDFParsingException(f"Error parsing PDF with docling {arxiv_data.pdf_url}: {e}")

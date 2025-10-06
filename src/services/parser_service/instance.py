@@ -7,6 +7,6 @@ def get_pdf_parser_service() -> PDFParserService:
     return PDFParserService(
         max_pages=25, 
         max_file_size_mb=5, 
-        ocr_option=True, 
+        ocr_option=False, 
         table_extraction=True
     )
