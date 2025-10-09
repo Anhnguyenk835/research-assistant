@@ -8,7 +8,7 @@ from schemas.arxiv.arxiv_models import ArxivPaper
 from services.arxiv_service.instance import make_arxiv_client
 from services.parser_service.instance import get_pdf_parser_service
 from services.parser_service.parser import PDFParserService
-from services.indexing.chunker import HeadingChunk
+from services.indexing_service.chunker import HeadingChunk
 from config import get_settings
 
 from docling.datamodel.base_models import InputFormat

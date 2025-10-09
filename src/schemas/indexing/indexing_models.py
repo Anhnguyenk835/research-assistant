@@ -2,6 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from schemas.parser.parser_models import PaperProv
+from schemas.arxiv.arxiv_models import ArxivPaper
 
 class ChunkMetadata(BaseModel):
     """ Metadata for a text chunk. """
@@ -18,4 +19,4 @@ class PaperChunk(BaseModel):
     """ Represents a chunk of text with associated metadata. """
     text: str = Field(..., description="The text content of the chunk")
     metadata: ChunkMetadata = Field(..., description="Metadata associated with the chunk")
-    arxiv_id: str = Field(..., description="The arXiv ID of the source paper, if applicable")
+    arxiv_metadata: Optional[ArxivPaper] = Field(..., description="The arXiv ID of the source paper, if applicable")
