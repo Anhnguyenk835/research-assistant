@@ -171,10 +171,8 @@ class HeadingChunk:
                    for keyword in reference_keywords)
     
     def _merge_list_items_to_last_section(self, section_list: List[Dict], list_items: List[Dict]) -> None:
-        """Merge buffered list_items to the last section in section_list.
-        
-        This modifies section_list in place. Allows exceeding max_chunk_size.
-        """
+        """Merge buffered list_items to the last section in section_list. This modifies section_list in place. Allows exceeding max_chunk_size."""
+
         if not section_list or not list_items:
             return
         
@@ -195,7 +193,7 @@ class HeadingChunk:
         
         logger.debug(f"Merged {len(list_items)} list_items ({list_items_word_count} words) to last section. "
                     f"New word count: {last_section['word_count']}")
-    
+
     def _group_by_header(self, section_list: List[Dict]) -> List[List[Dict]]:
         """Group sections by their header to maintain section boundaries.
         
