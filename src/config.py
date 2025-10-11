@@ -30,7 +30,7 @@ class ArxivSettings(BaseConfigSettings):
     base_url: str = Field(default="https://export.arxiv.org/api/query")
     rate_limit_delay: float = Field(default=3.0, description="Delay in seconds between API requests to respect rate limits.")
     timeout_seconds: int = Field(default=30, description="Timeout for API requests in seconds.")
-    max_results: int = Field(default=2, description="Maximum number of results to fetch per query.")
+    max_results: int = Field(default=1, description="Maximum number of results to fetch per query.")
     search_category: str = Field(default="cs.AI", description="Default category to search in arXiv.")
     download_max_retries: int = Field(default=3, description="Number of retries for downloading PDFs.")
     download_retry_delay: float = Field(default=5.0, description="Delay in seconds between download retries.")
@@ -67,6 +67,47 @@ class PDFParserSettings(BaseConfigSettings):
     table_extraction: bool = Field(default=True, description="Whether to enable table extraction from PDFs.")
 
 
+class ChunkingSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="CHUNKING_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    max_chunk_size: int = Field(default=500, description="Maximum number of words in a text chunk.")
+    min_chunk_size: int = Field(default=100, description="Minimum number of words in a text chunk.")
+    overlap_size: int = Field(default=0, description="Number of overlapping words between consecutive chunks.")
+
+
+class OpenSearchSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="OPENSEARCH_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    host: str = os.getenv("OPENSEARCH_HOST", "http://localhost:9200")
+    username: Optional[str] = os.getenv("OPENSEARCH_USERNAME", "admin")
+    password: Optional[str] = os.getenv("OPENSEARCH_PASSWORD", "Tanh080305@")
+
+    index_name: str = "arxiv-papers"
+    chunk_index_suffix: str = "chunks"  # Creates single hybrid index: {index_name}-{suffix}
+    max_text_size: int = 1000000
+
+    # Vector search settings
+    vector_dimension: int = 1024  # Jina embeddings dimension
+    vector_space_type: str = "cosinesimil"  # cosinesimil, l2, innerproduct
+
+    # Hybrid search settings
+    rrf_pipeline_name: str = "hybrid-rrf-pipeline"
+    hybrid_search_size_multiplier: int = 2  # Get k*multiplier for better recall
+
 
 class Settings(BaseConfigSettings):
     app_version: str = "0.1.0"
@@ -84,12 +125,14 @@ class Settings(BaseConfigSettings):
     # ollama_timeout: int = 300
 
     # Jina AI embeddings configuration
-    # jina_api_key: str = ""
+    jina_api_key: str = os.getenv("JINA_API_KEY")
+    if not jina_api_key:
+        raise ValueError("JINA_API_KEY environment variable is not set.")
 
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings)
-    # chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
-    # opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
+    opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
+    chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
     # langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
     # redis: RedisSettings = Field(default_factory=RedisSettings)
 

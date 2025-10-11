@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from opensearchpy import OpenSearch, helpers
 from config import Settings
 from .query_builder import QueryBuilder
-from .index_config import TEMPLATE_HYBRID_INDEX_MAPPING, HYBRID_RRF_PIPELINE
+from .index_config import ARXIV_PAPERS_CHUNKS_MAPPING, HYBRID_RRF_PIPELINE
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +20,29 @@ class OpenSearchClient:
 
         self.host = host
         self.settings = settings
-        self.index_name = settings.OPENSEARCH_INDEX_NAME
+        self.index_name = f"{settings.opensearch.index_name}-{settings.opensearch.chunk_index_suffix}"
 
-        self.client = OpenSearch(
-            hosts=[host],
-            use_ssl=True,
-            verify_certs=True,
-            ssl_show_warn=False,
-        )
+        # Build client configuration
+        client_config = {
+            "hosts": [host],
+            "use_ssl": True,
+            "verify_certs": False,
+            "ssl_show_warn": False,
+        }
 
-        logger.info("OpenSearch client initialized")
+        # Add authentication if credentials are provided
+        if settings.opensearch.username and settings.opensearch.password:
+            client_config["http_auth"] = (
+                settings.opensearch.username,
+                settings.opensearch.password
+            )
+            logger.info(f"OpenSearch client initialized with authentication for user: {settings.opensearch.username}")
+        else:
+            logger.warning("OpenSearch client initialized without authentication credentials")
+
+        self.client = OpenSearch(**client_config)
+
+        logger.info(f"OpenSearch client initialized with host: {host}")
 
     def health_check(self) -> bool:
         """Check OpenSearch cluster health."""
@@ -84,7 +97,7 @@ class OpenSearchClient:
             if not self.client.indices.exists(index=self.index_name):
                 self.client.indices.create(
                     index=self.index_name,
-                    body=TEMPLATE_HYBRID_INDEX_MAPPING
+                    body=ARXIV_PAPERS_CHUNKS_MAPPING
                 )
                 logger.info(f"Created index {self.index_name}")
                 return True
@@ -153,7 +166,7 @@ class OpenSearchClient:
             if categories:
                 filter_clause.append({
                     "terms": {
-                        "categories": categories.split(",")
+                        "arxiv_metadata.categories": categories
                     }
                 })
             
@@ -280,6 +293,14 @@ class OpenSearchClient:
             "highlight": bm25_search_body["highlight"],
         }
 
+        if categories:
+            query_body["query"] = {
+                "bool": {
+                    "must": hybrid_query,
+                    "filter": [{"terms": {"arxiv_metadata.categories": categories}}]
+                }
+            }
+
         # Execute search with RRF pipeline
         response = self.client.search(
             index=self.index_name, 
@@ -350,7 +371,7 @@ class OpenSearchClient:
             success, failed = helpers.bulk(self.client, actions, refresh=True)
 
             logger.info(f"Bulk indexed {success} chunks with {len(failed)} failures")
-            return {"indexed": success, "errors": len(failed)}
+            return {"success": success, "failed": len(failed)}
         
         except Exception as e:
             logger.error(f"Bulk indexing failed: {e}")
@@ -366,10 +387,9 @@ class OpenSearchClient:
             response = self.client.delete_by_query(
                 index=self.index_name, 
                 body={
-                    "query": 
-                        {"term": 
-                            {
-                                "arxiv_id": arxiv_id
+                    "query": {
+                            "term": {
+                                "arxiv_metadata.arxiv_id": arxiv_id
                             }
                         }
                     }, 
@@ -392,9 +412,13 @@ class OpenSearchClient:
         """
         try:
             search_body = {
-                "query": {"term": {"arxiv_id": arxiv_id}},
+                "query": {
+                    "term": {
+                        "arxiv_metadata.arxiv_id": arxiv_id
+                    }
+                },
                 "size": 1000,
-                "sort": [{"chunk_index": "asc"}],
+                "sort": [{"chunk_metadata.chunk_id": "asc"}],
                 "_source": {"excludes": ["embedding"]},
             }
 
@@ -402,9 +426,9 @@ class OpenSearchClient:
 
             chunks = []
             for hit in response["hits"]["hits"]:
-                chunk = hit["_source"]
-                chunk["chunk_id"] = hit["_id"]
-                chunks.append(chunk)
+                src = hit["_source"]
+                src["chunk_id"] = src["chunk_metadata"]["chunk_id"]
+                chunks.append(src)
 
             return chunks
 

@@ -4,8 +4,6 @@ from pathlib import Path
 import logging
 from collections import deque
 
-from mistralai import TextChunk
-
 from schemas.indexing.indexing_models import PaperChunk, ChunkMetadata
 from schemas.parser.parser_models import ParsedPaper, PaperSection
 
@@ -23,35 +21,27 @@ class HeadingChunk:
         """ Chunk the text under the heading into smaller pieces if it exceeds max_chunk_size. """
 
         chunks: List[PaperChunk] = []
-        arxiv_id = paper_data.metadata.arxiv_id
+        arxiv_metadata = paper_data.metadata
         
         try: 
-            section_chunks = self._chunk_by_section(paper_data.content.sections)
+            section_chunks = self._chunk_by_section(paper_data.content.sections, arxiv_metadata)
             if section_chunks:
-                # Set arxiv_id for each chunk
-                for chunk in section_chunks:
-                    chunk.arxiv_id = arxiv_id
                 chunks.extend(section_chunks)
-                logger.info(f"Created {len(section_chunks)} section-based chunks for {arxiv_id}")
+                logger.info(f"Created {len(section_chunks)} section-based chunks for {arxiv_metadata.arxiv_id}")
         except Exception as e:
-            logger.error(f"Error chunking sections for {arxiv_id}: {e}")
-            section_chunks = []
+            logger.error(f"Error chunking sections for {arxiv_metadata.arxiv_id}: {e}")
         
         try: 
-            table_chunks = self._chunk_by_table(paper_data.content.tables)
+            table_chunks = self._chunk_by_table(paper_data.content.tables, arxiv_metadata)
             if table_chunks:
-                # Set arxiv_id for each chunk
-                for chunk in table_chunks:
-                    chunk.arxiv_id = arxiv_id
                 chunks.extend(table_chunks)
-                logger.info(f"Created {len(table_chunks)} table-based chunks for {arxiv_id}")
+                logger.info(f"Created {len(table_chunks)} table-based chunks for {arxiv_metadata.arxiv_id}")
         except Exception as e:
-            logger.error(f"Error chunking tables for {arxiv_id}: {e}")
-            table_chunks = []
+            logger.error(f"Error chunking tables for {arxiv_metadata.arxiv_id}: {e}")
 
         return chunks
     
-    def _chunk_by_section(self, sections: List[PaperSection]) -> List[PaperChunk]:
+    def _chunk_by_section(self, sections: List[PaperSection], arxiv_metadata) -> List[PaperChunk]:
         """ Chunk text by section with header-based chunking and smart merging.
         
         Algorithm:
@@ -88,7 +78,7 @@ class HeadingChunk:
             processed_sections.extend(merged_group)
 
         # Split large sections and create final chunks
-        chunks = self._create_chunks_from_sections(processed_sections)
+        chunks = self._create_chunks_from_sections(processed_sections, arxiv_metadata)
         
         return chunks
     
@@ -375,7 +365,7 @@ class HeadingChunk:
             'word_count': combined_word_count
         }
     
-    def _create_chunks_from_sections(self, sections: List[Dict]) -> List[PaperChunk]:
+    def _create_chunks_from_sections(self, sections: List[Dict], arxiv_metadata) -> List[PaperChunk]:
         """Create final chunks from processed sections, splitting if needed.
         
         If a section exceeds max_chunk_size, split it into multiple chunks.
@@ -392,17 +382,18 @@ class HeadingChunk:
                     text=full_text,
                     chunk_id=f"section_{idx+1}",
                     section_heading=section['header'],
-                    prov=section['prov']
+                    prov=section['prov'],
+                    arxiv_metadata=arxiv_metadata
                 )
                 chunks.append(chunk)
             else:
                 # Section is too large, split it
-                sub_chunks = self._split_large_section(section, idx)
+                sub_chunks = self._split_large_section(section, idx, arxiv_metadata)
                 chunks.extend(sub_chunks)
         
         return chunks
     
-    def _split_large_section(self, section: Dict, section_idx: int) -> List[PaperChunk]:
+    def _split_large_section(self, section: Dict, section_idx: int, arxiv_metadata) -> List[PaperChunk]:
         """Split a large section into multiple chunks.
         
         Algorithm:
@@ -434,7 +425,8 @@ class HeadingChunk:
                     text=full_text,
                     chunk_id=f"section_{section_idx+1}_part_{sub_chunk_idx+1}",
                     section_heading=header,
-                    prov=section['prov']
+                    prov=section['prov'],
+                    arxiv_metadata=arxiv_metadata
                 )
                 chunks.append(chunk)
                 
@@ -455,7 +447,8 @@ class HeadingChunk:
                 text=full_text,
                 chunk_id=f"section_{section_idx+1}_part_{sub_chunk_idx+1}",
                 section_heading=header,
-                prov=section['prov']
+                prov=section['prov'],
+                arxiv_metadata=arxiv_metadata
             )
             chunks.append(chunk)
         
@@ -474,7 +467,7 @@ class HeadingChunk:
             return f"{header}\n{text}"
         return text
     
-    def _create_chunk(self, text: str, chunk_id: str, section_heading: str, prov) -> PaperChunk:
+    def _create_chunk(self, text: str, chunk_id: str, section_heading: str, prov, arxiv_metadata) -> PaperChunk:
         """Create a PaperChunk object."""
         word_count = len(text.split())
         
@@ -491,7 +484,7 @@ class HeadingChunk:
                 section_heading=section_heading,
                 prov=flattened_prov
             ),
-            arxiv_id=""  # to be set later by caller
+            arxiv_metadata=arxiv_metadata
         )
     
     def _flatten_prov(self, prov):
@@ -511,7 +504,7 @@ class HeadingChunk:
         flatten_recursive(prov)
         return flattened if flattened else None
     
-    def _chunk_by_table(self, tables: List) -> List[PaperChunk]:
+    def _chunk_by_table(self, tables: List, arxiv_metadata) -> List[PaperChunk]:
         """Chunk tables into individual chunks.
         
         Each table becomes a single chunk with its caption prepended.
@@ -519,6 +512,7 @@ class HeadingChunk:
         
         Args:
             tables: List of PaperTable objects
+            arxiv_metadata: ArxivPaper metadata object
             
         Returns:
             List of PaperChunk objects, one per table
@@ -555,9 +549,9 @@ class HeadingChunk:
                     end_char=len(full_text),
                     word_count=word_count,
                     section_heading=table.label if table.label else f"Table {idx+1}",
-                    prov=table.prov
+                    prov=table.prov if isinstance(table.prov, list) else [table.prov] if table.prov else None
                 ),
-                arxiv_id=""  # Set by caller
+                arxiv_metadata=arxiv_metadata
             )
             
             chunks.append(chunk)

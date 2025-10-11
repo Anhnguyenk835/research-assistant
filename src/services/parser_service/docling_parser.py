@@ -250,7 +250,7 @@ class DoclingParser:
             pages = self._extract_pages(document)
 
             # drop sections with label = caption, page_header, foot_note
-            # sections = [sec for sec in sections if sec.label.lower() not in ["caption", "page_header", "foot_note"]]
+            sections = [sec for sec in sections if sec.label.lower() not in ["caption", "page_header", "foot_note", "page_footer"]]
 
             return ParsedPaper(
                 metadata=arxiv_data,

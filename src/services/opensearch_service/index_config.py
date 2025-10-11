@@ -35,12 +35,10 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
                 "type": "object",
                 "properties": {
                     "chunk_id": {"type": "keyword"},
-                    "paper_id": {"type": "keyword"},
-                    "arxiv_id": {"type": "keyword"},
-                    "chunk_index": {"type": "integer"},
-                    "chunk_word_count": {"type": "integer"},
                     "start_char": {"type": "integer"},
                     "end_char": {"type": "integer"},
+                    "chunk_word_count": {"type": "integer"},
+                    "section_heading": {"type": "keyword"},
                     "prov": {
                         "type": "nested",
                         "properties": {
@@ -67,6 +65,7 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
             "arxiv_metadata": {
                 "type": "object",
                 "properties": {
+                    "arxiv_id": {"type": "keyword"},
                     "title": {
                         "type": "text",
                         "analyzer": "text_analyzer",
@@ -84,8 +83,7 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
                     "abstract": {"type": "text", "analyzer": "text_analyzer"},
                     "categories": {"type": "keyword"},
                     "published_date": {"type": "date"},
-                    "section_title": {"type": "keyword"},
-                    "embedding_model": {"type": "keyword"}
+                    "pdf_url": {"type": "keyword"}
                 }
             },
 

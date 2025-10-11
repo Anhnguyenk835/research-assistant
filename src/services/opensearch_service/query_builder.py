@@ -33,7 +33,7 @@ class QueryBuilder:
         :param latest_papers: Sort by publication date instead of relevance
         :param search_chunks: Whether searching chunks (True) or papers (False)
         """
-        self.query = query
+        self.query = query.strip()
         self.size = size
         self.from_ = from_
         self.categories = categories
@@ -41,11 +41,20 @@ class QueryBuilder:
         self.latest_papers = latest_papers
         self.search_chunks = search_chunks
 
+        # weight of fields for scoring
         if fields is None:
             if search_chunks:
-                self.fields = ["chunk_text^3", "title^2", "abstract^1"]
+                self.fields = [
+                    "chunk_text^3", 
+                    "arxiv_metadata.title^2", 
+                    "arxiv_metadata.abstract^1"
+                ]
             else:
-                self.fields = ["title^3", "abstract^2", "authors^1"]
+                self.fields = [
+                    "arxiv_metadata.title^3", 
+                    "arxiv_metadata.abstract^2", 
+                    "arxiv_metadata.authors^1"
+                ]
         else:
             self.fields = fields
 
@@ -101,11 +110,12 @@ class QueryBuilder:
         return {
             "multi_match": {
                 "query": self.query,
-                "fields": self.fields,
+                "fields": self.fields,  # field weighting
                 "type": "best_fields",
                 "operator": "or",
-                "fuzziness": "AUTO",
-                "prefix_length": 2,
+                "fuzziness": "AUTO",    # for typo tolerance
+                "prefix_length": 2,     # number of initial characters not to fuzzify
+                "minimum_should_match": "2<75%",  # at least 2 words or 75% of words should match
             }
         }
 
@@ -117,7 +127,12 @@ class QueryBuilder:
         filters = []
 
         if self.categories:
-            filters.append({"terms": {"categories": self.categories}})
+            filters.append(
+                {"terms": {
+                    "arxiv_metadata.categories": self.categories
+                    }
+                }
+            )
 
         return filters
 
@@ -129,7 +144,17 @@ class QueryBuilder:
         if self.search_chunks:
             return {"excludes": ["embedding"]}
         else:
-            return ["arxiv_id", "title", "authors", "abstract", "categories", "published_date", "pdf_url"]
+            return {
+                "includes": [
+                    "arxiv_metadata.arxiv_id", 
+                    "arxiv_metadata.title", 
+                    "arxiv_metadata.authors", 
+                    "arxiv_metadata.abstract", 
+                    "arxiv_metadata.categories", 
+                    "arxiv_metadata.published_date", 
+                    "arxiv_metadata.pdf_url"
+                ]
+            }
 
     def _build_highlight(self) -> Dict[str, Any]:
         """Build highlighting configuration.
@@ -145,8 +170,13 @@ class QueryBuilder:
                         "pre_tags": ["<mark>"],
                         "post_tags": ["</mark>"],
                     },
-                    "title": {"fragment_size": 0, "number_of_fragments": 0, "pre_tags": ["<mark>"], "post_tags": ["</mark>"]},
-                    "abstract": {
+                    "arxiv_metadata.title": {
+                        "fragment_size": 0, 
+                        "number_of_fragments": 0, 
+                        "pre_tags": ["<mark>"], 
+                        "post_tags": ["</mark>"]
+                    },
+                    "arxiv_metadata.abstract": {
                         "fragment_size": 150,
                         "number_of_fragments": 1,
                         "pre_tags": ["<mark>"],
@@ -159,17 +189,17 @@ class QueryBuilder:
             # Paper-specific highlighting
             return {
                 "fields": {
-                    "title": {
+                    "arxiv_metadata.title": {
                         "fragment_size": 0,
                         "number_of_fragments": 0,
                     },
-                    "abstract": {
+                    "arxiv_metadata.abstract": {
                         "fragment_size": 150,
                         "number_of_fragments": 3,
                         "pre_tags": ["<mark>"],
                         "post_tags": ["</mark>"],
                     },
-                    "authors": {
+                    "arxiv_metadata.authors": {
                         "fragment_size": 0,
                         "number_of_fragments": 0,
                         "pre_tags": ["<mark>"],
@@ -185,9 +215,17 @@ class QueryBuilder:
         :returns: Sort configuration or None for relevance scoring
         """
         if self.latest_papers:
-            return [{"published_date": {"order": "desc"}}, "_score"]
+            return [
+                {"arxiv_metadata.published_date": {"order": "desc"}},
+                {"_score": {"order": "desc"}}
+            ]
 
         if self.query.strip():
             return None
 
-        return [{"published_date": {"order": "desc"}}, "_score"]
+        return [
+            {
+                "arxiv_metadata.published_date": {"order": "desc"}
+            }, 
+            {"_score": {"order": "desc"}}
+        ]

@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field
 from schemas.parser.parser_models import PaperProv
 from schemas.arxiv.arxiv_models import ArxivPaper
 
+
+# note that need to add chunk_index (integer)
 class ChunkMetadata(BaseModel):
     """ Metadata for a text chunk. """
     chunk_id: str = Field(..., description="Unique identifier for the chunk")
