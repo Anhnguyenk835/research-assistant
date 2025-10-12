@@ -59,7 +59,7 @@ class HybridIndexingService:
             for chunk, embedding in zip(chunks, embeddings):
                 # prepare data for opensearch
                 chunk_data = {
-                    "text": chunk.text,
+                    "chunk_text": chunk.text, 
                     "chunk_metadata": {
                         "chunk_id": chunk.metadata.chunk_id,
                         "start_char": chunk.metadata.start_char,

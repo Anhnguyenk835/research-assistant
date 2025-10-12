@@ -15,7 +15,7 @@ class QueryBuilder:
         self,
         query: str,
         size: int = 10,
-        from_: int = 0,
+        _from: int = 0,
         fields: Optional[List[str]] = None,
         categories: Optional[List[str]] = None,
         track_total_hits: bool = True,
@@ -26,7 +26,7 @@ class QueryBuilder:
 
         :param query: Search query text
         :param size: Number of results to return
-        :param from_: Offset for pagination
+        :param _from: Offset for pagination
         :param fields: Fields to search in (if None, auto-determined based on search_chunks)
         :param categories: Filter by categories
         :param track_total_hits: Whether to track total hits accurately
@@ -35,7 +35,7 @@ class QueryBuilder:
         """
         self.query = query.strip()
         self.size = size
-        self.from_ = from_
+        self._from = _from
         self.categories = categories
         self.track_total_hits = track_total_hits
         self.latest_papers = latest_papers
@@ -66,7 +66,7 @@ class QueryBuilder:
         query_body = {
             "query": self._build_query(),
             "size": self.size,
-            "from": self.from_,
+            "from": self._from,
             "track_total_hits": self.track_total_hits,
             "_source": self._build_source_fields(),
             "highlight": self._build_highlight(),

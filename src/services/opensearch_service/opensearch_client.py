@@ -59,7 +59,7 @@ class OpenSearchClient:
         """Get statistics for the configured index."""
         try:
             if not self.client.indices.exists(index=self.index_name):
-                logger.warning(f"Index {self.index_name} does not exist.")
+                logger.info(f"Index {self.index_name} does not exist.")  # Changed from WARNING to INFO
                 return {"index_name": self.index_name, "exists": False, "document_count": 0}
             
             stats_response = self.client.indices.stats(index=self.index_name)

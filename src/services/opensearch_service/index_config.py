@@ -11,8 +11,7 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0,
-        "index.knn": True,
-        "index.knn.space_type": "cosinesimil",
+        "index.knn": True,  # Enable KNN at index level
         "analysis": {
             "analyzer": {
                 "standard_analyzer": {
@@ -45,13 +44,13 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
                             "page_no": {"type": "integer"},
                             "bbox": {
                                 "type": "object",
+                                "enabled": False,  # Disable indexing/searching on bbox
                                 "properties": {
                                     "left": {"type": "float"},
                                     "top": {"type": "float"},
                                     "right": {"type": "float"},
                                     "bottom": {"type": "float"}
-                                },
-                                "index": False  # not searchable
+                                }
                             },
                             "charspan": {"type": "float"}
                         }
@@ -103,8 +102,11 @@ ARXIV_PAPERS_CHUNKS_MAPPING = {
                 "method": {
                     "name": "hnsw",
                     "space_type": "cosinesimil",
-                    "engine": "nmslib",
-                    "parameters": {"ef_construction": 512, "m": 16}
+                    "engine": "lucene",  # Use lucene engine (nmslib is deprecated in OpenSearch 3.0+)
+                    "parameters": {
+                        "ef_construction": 512,
+                        "m": 16
+                    }
                 }
             }
         }
