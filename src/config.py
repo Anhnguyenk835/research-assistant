@@ -109,39 +109,67 @@ class OpenSearchSettings(BaseConfigSettings):
     hybrid_search_size_multiplier: int = 2  # Get k*multiplier for better recall
 
 
+class GroqSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="GROQ_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    api_key: str = Field(default_factory=lambda: os.getenv("GROQ_API_KEY", ""))
+    model: str = Field(default="llama-3.3-70b-versatile", description="Groq model to use for LLM")
+    base_url: str = Field(default="https://api.groq.com/openai/v1", description="Groq API base URL")
+    temperature: float = Field(default=0.3, description="Temperature for RAG responses (lower = more factual)")
+    max_tokens: int = Field(default=2048, description="Maximum tokens for response generation")
+    timeout_seconds: int = Field(default=60, description="Timeout for API requests in seconds")
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
+        if not v:
+            raise ValueError("GROQ_API_KEY environment variable is not set")
+        return v
+
+
+class JinaSettings(BaseConfigSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="JINA_",
+        frozen=True,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
+    api_key: str = Field(default_factory=lambda: os.getenv("JINA_API_KEY", ""))
+    base_url: str = Field(default="https://api.jina.ai/v1", description="Jina API base URL")
+    model: str = Field(default="jina-embeddings-v3", description="Jina embedding model")
+    dimension: int = Field(default=1024, description="Embedding dimension")
+    timeout_seconds: int = Field(default=30, description="Timeout for API requests in seconds")
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
+        if not v:
+            raise ValueError("JINA_API_KEY environment variable is not set")
+        return v
+
+
 class Settings(BaseConfigSettings):
     app_version: str = "0.1.0"
     debug: bool = True
     environment: Literal["development", "staging", "production"] = "development"
     service_name: str = "rag-api"
 
-    # postgres_database_url: str = "postgresql://rag_user:rag_password@localhost:5432/rag_db"
-    # postgres_echo_sql: bool = False
-    # postgres_pool_size: int = 20
-    # postgres_max_overflow: int = 0
-
-    # ollama_host: str = "http://localhost:11434"
-    # ollama_model: str = "llama3.2:1b"
-    # ollama_timeout: int = 300
-
-    # Jina AI embeddings configuration
-    jina_api_key: str = os.getenv("JINA_API_KEY")
-    if not jina_api_key:
-        raise ValueError("JINA_API_KEY environment variable is not set.")
-
     arxiv: ArxivSettings = Field(default_factory=ArxivSettings)
     pdf_parser: PDFParserSettings = Field(default_factory=PDFParserSettings)
     opensearch: OpenSearchSettings = Field(default_factory=OpenSearchSettings)
     chunking: ChunkingSettings = Field(default_factory=ChunkingSettings)
-    # langfuse: LangfuseSettings = Field(default_factory=LangfuseSettings)
-    # redis: RedisSettings = Field(default_factory=RedisSettings)
-
-    # @field_validator("postgres_database_url")
-    # @classmethod
-    # def validate_database_url(cls, v: str) -> str:
-    #     if not (v.startswith("postgresql://") or v.startswith("postgresql+psycopg2://")):
-    #         raise ValueError("Database URL must start with 'postgresql://' or 'postgresql+psycopg2://'")
-    #     return v
+    groq: GroqSettings = Field(default_factory=GroqSettings)
+    jina: JinaSettings = Field(default_factory=JinaSettings)
 
 
 def get_settings() -> Settings:
