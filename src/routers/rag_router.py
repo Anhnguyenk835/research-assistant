@@ -123,6 +123,12 @@ async def query_rag(
                 max_tokens=request.max_tokens
             )
             logger.info(f"Answer generated successfully (model: {rag_result['model']})")
+
+            # save the rag result to json for debugging
+            import json
+            with open("rag_result.json", "w") as f:
+                json.dump(rag_result, f, indent=2)
+
         except Exception as e:
             logger.error(f"Failed to generate answer: {e}")
             raise HTTPException(
@@ -130,23 +136,7 @@ async def query_rag(
                 detail=f"Failed to generate answer: {str(e)}"
             )
         
-        # Step 4: Format response
-        sources = [
-            SearchResultSource(**source)
-            for source in rag_result['sources']
-        ]
-        
-        response = RAGQueryResponse(
-            query=rag_result['query'],
-            answer=rag_result['answer'],
-            sources=sources,
-            num_sources=rag_result['num_sources'],
-            model=rag_result['model'],
-            finish_reason=rag_result['finish_reason']
-        )
-        
-        logger.info(f"RAG query completed successfully with {len(sources)} sources")
-        return response
+        return rag_result
         
     except HTTPException:
         raise

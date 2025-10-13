@@ -1,17 +1,8 @@
 """Prompt templates for LLM interactions."""
 
-# System prompt for RAG
-RAG_SYSTEM_PROMPT = """You are a helpful research assistant specializing in academic papers from arXiv. 
-Your task is to answer questions based on the provided research paper excerpts.
-
-Guidelines:
-- Be precise and factual, using only information from the provided context
-- Cite sources using [Source N] notation when referencing specific information
-- If multiple sources support a point, cite all relevant sources
-- If the context doesn't contain enough information to answer fully, acknowledge the limitations
-- Maintain academic tone and precision
-- Synthesize information across sources when appropriate
-- Don't make assumptions or add information not present in the sources"""
+import json
+from typing import Type, Any
+from pydantic import BaseModel
 
 # System prompt for general questions
 GENERAL_SYSTEM_PROMPT = """You are a helpful AI assistant specializing in research and academic topics.
@@ -28,20 +19,103 @@ Analyze the provided papers and highlight similarities, differences, and unique 
 Organize your comparison clearly and provide insights into how the works relate to each other."""
 
 
-def build_rag_prompt(query: str, context: str) -> str:
+def get_json_schema_from_model(model_class: Type[BaseModel]) -> dict:
+    """Extract JSON schema from a Pydantic model class.
+    
+    :param model_class: Pydantic BaseModel class
+    :returns: JSON schema dictionary
+    """
+    return model_class.model_json_schema()
+
+
+def format_schema_as_example(schema: dict) -> str:
+    """Format a JSON schema as a readable example structure.
+    
+    :param schema: JSON schema dictionary
+    :returns: Formatted JSON string example
+    """
+    def build_example(schema_def: dict, definitions: dict = None) -> Any:
+        """Recursively build an example from schema definition."""
+        if definitions is None:
+            definitions = schema.get('$defs', {})
+        
+        schema_type = schema_def.get('type')
+        
+        if '$ref' in schema_def:
+            # Handle references to other definitions
+            ref_path = schema_def['$ref'].split('/')[-1]
+            if ref_path in definitions:
+                return build_example(definitions[ref_path], definitions)
+        
+        if schema_type == 'object':
+            properties = schema_def.get('properties', {})
+            example_obj = {}
+            for prop_name, prop_schema in properties.items():
+                example_obj[prop_name] = build_example(prop_schema, definitions)
+            return example_obj
+        
+        elif schema_type == 'array':
+            items_schema = schema_def.get('items', {})
+            return [build_example(items_schema, definitions)]
+        
+        elif schema_type == 'string':
+            # Use description or example if available
+            return schema_def.get('description', '<string>')
+        
+        elif schema_type == 'integer':
+            return schema_def.get('example', 0)
+        
+        elif schema_type == 'number':
+            return schema_def.get('example', 0.0)
+        
+        elif schema_type == 'boolean':
+            return schema_def.get('example', False)
+        
+        else:
+            return schema_def.get('description', '<value>')
+    
+    example = build_example(schema)
+    return json.dumps(example, indent=2)
+
+
+def build_rag_prompt(query: str, context: str, response_model: Type[BaseModel] = None) -> str:
     """Build a RAG prompt with query and context.
     
     :param query: User's question
     :param context: Retrieved context from search results
+    :param response_model: Optional Pydantic model class for structured output
     :returns: Formatted prompt
     """
-    return f"""Context from research papers:
+    # Get JSON schema if response model is provided
+    json_output_instruction = ""
+    if response_model:
+        schema = get_json_schema_from_model(response_model)
+        example = format_schema_as_example(schema)
+        json_output_instruction = f"\nExpected JSON structure:\n{schema}"
+    else:
+        json_output_instruction = '\n{\n  "response": "<your answer with inline citations like [1], [2]>",\n  "confidence_level": "<high|medium|low>"\n}'
+    
+    rag_prompt = f"""<system_instructions>
+You are a research assistant. Answer the question in <user_query> based *only* on the information within the <documents> section.
+If the information is not found, state 'Information not available in provided documents.'
+Format your answer as a JSON object. Include inline citation markers in your response using [N] notation where N is the Source number.
+Follow these instructions for staged reasoning:
+1. Identify the source index in the provided documents that are directly relevant to answering the user's question
+2. Based *only* on the content identified in step 1, formulate a comprehensive answer to the user's question. Provide inline citation markers in synthesized response, where each marker index maps to the corresponding source index document.
+3. Check your answer for factual accuracy and completeness. Ensure the inline citations correctly reference the sources used.
+</system_instructions>
 
+<documents>
 {context}
+</documents>
 
-Question: {query}
+<user_query>
+{query}
+</user_query>
 
-Please answer the question based on the provided context. Cite sources using [Source N] notation."""
+JSON Output:{json_output_instruction}"""
+
+    return rag_prompt
 
 
 def build_summarization_prompt(text: str, max_length: int = 200) -> str:
@@ -86,13 +160,13 @@ Please analyze:
 
 
 def format_search_results_context(search_results: list[dict], max_chunks: int = 5) -> str:
-    """Format search results into context string for RAG.
+    """Format search results into JSON context string for RAG.
     
     :param search_results: List of search result dictionaries
     :param max_chunks: Maximum number of chunks to include
-    :returns: Formatted context string
+    :returns: Formatted JSON string with sources
     """
-    context_parts = []
+    sources = []
     
     for i, result in enumerate(search_results[:max_chunks], 1):
         chunk_data = result.get('chunk', {})
@@ -101,16 +175,22 @@ def format_search_results_context(search_results: list[dict], max_chunks: int = 
         
         arxiv_id = arxiv_meta.get('arxiv_id', 'N/A')
         title = arxiv_meta.get('title', 'N/A')
-        section = chunk_meta.get('section_heading', 'N/A')
         text = chunk_data.get('chunk_text', '')
-        score = result.get('score', 0)
+        prov = chunk_meta.get('prov', None)
         
-        context_parts.append(
-            f"[Source {i}] (Relevance Score: {score:.3f})\n"
-            f"Paper: {title}\n"
-            f"arXiv ID: {arxiv_id}\n"
-            f"Section: {section}\n"
-            f"Content:\n{text}\n"
-        )
+        # Build source dictionary
+        source = {
+            "Source": i,
+            "Paper": title,
+            "arXiv ID": arxiv_id,
+            "Content": text
+        }
+        
+        # Add prov if available
+        if prov:
+            source["prov"] = prov
+        
+        sources.append(source)
     
-    return "\n---\n".join(context_parts)
+    # Return formatted JSON string
+    return json.dumps(sources, indent=2)

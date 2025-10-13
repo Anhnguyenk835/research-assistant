@@ -3,7 +3,8 @@ from groq import Groq
 from typing import Dict, Any, List, Optional
 
 from config import Settings
-from .prompt import GENERAL_SYSTEM_PROMPT
+from .prompt import GENERAL_SYSTEM_PROMPT, RAG_SYSTEM_PROMPT, build_rag_prompt, format_search_results_context
+from schemas.rag.rag_models import RAGResponse
 
 logger = logging.getLogger(__name__)
 
@@ -109,71 +110,34 @@ class GroqClient:
         :returns: Dictionary with answer, sources, and metadata
         """
         try:
-            # Build context from search results
-            context_parts = []
-            sources = []
 
-            for i, result in enumerate(search_results, 1):
-                chunk_data = result.get('chunk', {})
-                arxiv_meta = chunk_data.get('arxiv_metadata', {})
-                chunk_meta = chunk_data.get('chunk_metadata', {})
-                
-                # Extract relevant information
-                arxiv_id = arxiv_meta.get('arxiv_id', 'N/A')
-                title = arxiv_meta.get('title', 'N/A')
-                section = chunk_meta.get('section_heading', 'N/A')
-                text = chunk_data.get('chunk_text', '')
-                score = result.get('score', 0)
-                prov = chunk_meta.get('prov', None)
+            # Save search results to json for debugging
+            import json
+            with open("search_results.json", "w") as f:
+                json.dump(search_results, f, indent=2)
 
-                # Add to context
-                context_parts.append(
-                    f"[Source {i}] (Score: {score:.3f})\n"
-                    f"Paper: {title} (arXiv:{arxiv_id})\n"
-                    f"Section: {section}\n"
-                    f"Content: {text}\n"
-                )
+            # Build context from search results using the prompt helper function
+            context = format_search_results_context(search_results, max_chunks=len(search_results))
 
-                # Track source metadata
-                source_dict = {
-                    "rank": i,
-                    "arxiv_id": arxiv_id,
-                    "title": title,
-                    "section": section,
-                    "score": score,
-                    "chunk_id": result.get('chunk_id', 'N/A'),
-                    "chunk_text": text
-                }
-                
-                # Add prov if available
-                if prov:
-                    source_dict["prov"] = prov
-                
-                sources.append(source_dict)
+            # Build RAG prompt using the prompt template with JSON schema
+            system_prompt = build_rag_prompt(query, context, response_model=RAGResponse)
 
-            # Combine context
-            context = "\n---\n".join(context_parts)
+            # save system prompt to txt
+            with open("system_prompt.txt", "w") as f:
+                f.write(system_prompt)
 
-            # Default system prompt for RAG
-            default_system_prompt = (
-                "You are a helpful research assistant. Answer the user's question based on the provided research paper excerpts. "
-                "Be precise and cite the sources using [Source N] notation. If the provided context doesn't contain enough information, "
-                "acknowledge what you don't know rather than making assumptions."
-            )
-
-            # Build messages
+            # Build messages with system prompt
             messages = [
                 {
                     "role": "system",
-                    "content": system_prompt or default_system_prompt
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Context from research papers:\n\n{context}\n\nQuestion: {query}\n\nAnswer:"
+                    "content": query
                 }
             ]
 
-            # Use Groq SDK to generate completion
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -188,9 +152,8 @@ class GroqClient:
 
             return {
                 "answer": answer,
-                "sources": sources,
                 "query": query,
-                "num_sources": len(sources),
+                "num_sources": len(search_results),
                 "model": completion.model,
                 "usage": completion.usage.model_dump() if completion.usage else {},
                 "finish_reason": completion.choices[0].finish_reason or "unknown"

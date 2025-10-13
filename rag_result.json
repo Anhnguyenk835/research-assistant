@@ -1,0 +1,16 @@
+{
+  "answer": "{\n  \"response\": \"Document 1 introduces the BLAZER methodology for training specialized LLM agents for robotic manipulation [1]. The data generation process is further described in Document 2, which states that many efforts have been dedicated to scaling up training data for manipulation tasks [2]. Some works collect real-world grasping data by deploying random trials followed by verification as well as collection of human demonstrations [2]. Another approach is to collect demonstrations in simulation, which can be challenging as it requires significant human efforts to create diverse simulation tasks and scenes [2]. The BLAZER framework proposes a solution where an arbitrary number of data can be generated in simulation, benefiting from the reasoning and coding capabilities of LLMs to synthesize verification data with no human intervention [2].\",\n  \"sources\": [\n    {\n      \"inline_index\": 0,\n      \"rank\": 1,\n      \"arxiv_id\": \"2510.08572v1\",\n      \"title\": \"BLAZER: Bootstrapping LLM-based Manipulation Agents with Zero-Shot Data Generation\",\n      \"section\": \"III. METHOD\",\n      \"score\": 0.8,\n      \"chunk_id\": \"chunk_1\",\n      \"prov\": [\n        {\n          \"page_no\": 3,\n          \"bbox\": {\n            \"l\": 54.0,\n            \"t\": 198.466,\n            \"r\": 298.801,\n            \"b\": 58.40700000000004,\n            \"coord_origin\": \"BOTTOMLEFT\"\n          },\n          \"charspan\": [\n            0.0,\n            683.0\n          ]\n        }\n      ],\n      \"chunk_text\": \"III. METHOD\\nHere, we introduce the BLAZER methodology for training specialized LLM agents for robotic manipulation. In short, we aim to finetune an existing lightweight LLM on synthetically-generated data, tuning it for the generation of manipulation-oriented robotics policies.\"\n    },\n    {\n      \"inline_index\": 1,\n      \"rank\": 2,\n      \"arxiv_id\": \"2510.08572v1\",\n      \"title\": \"BLAZER: Bootstrapping LLM-based Manipulation Agents with Zero-Shot Data Generation\",\n      \"section\": \"C. Data Generation for Manipulation\",\n      \"score\": 0.7,\n      \"chunk_id\": \"chunk_2\",\n      \"prov\": [\n        {\n          \"page_no\": 2,\n          \"bbox\": {\n            \"l\": 313.2,\n            \"t\": 162.60000000000002,\n            \"r\": 558.001,\n            \"b\": 58.40700000000004,\n            \"coord_origin\": \"BOTTOMLEFT\"\n          },\n          \"charspan\": [\n            0.0,\n            516.0\n          ]\n        }\n      ],\n      \"chunk_text\": \"C. Data Generation for Manipulation\\nMany efforts have been dedicated to scale up training data for manipulation tasks. Some works collect real-world grasping data [31], [6] by deploying random trials followed by verification as well as collection of human demonstrations.\"\n    }\n  ]\n}",
+  "query": "How data was generated",
+  "num_sources": 2,
+  "model": "llama-3.3-70b-versatile",
+  "usage": {
+    "completion_tokens": 654,
+    "prompt_tokens": 2002,
+    "total_tokens": 2656,
+    "completion_time": 1.376675108,
+    "prompt_time": 0.169668174,
+    "queue_time": 0.04200841,
+    "total_time": 1.546343282
+  },
+  "finish_reason": "stop"
+}

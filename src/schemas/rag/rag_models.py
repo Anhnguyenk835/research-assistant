@@ -29,10 +29,9 @@ class ProvenanceInfo(BaseModel):
     bbox: BoundingBox = Field(..., description="Bounding box of the text on the page")
     charspan: Optional[List[float]] = Field(None, description="Character span in the text")
 
-
 class SearchResultSource(BaseModel):
     """Source information from search results."""
-    
+    inline_index: int = Field(..., description="Index of the source in the inline list")
     rank: int = Field(..., description="Rank of the source in search results")
     arxiv_id: str = Field(..., description="ArXiv ID of the paper")
     title: str = Field(..., description="Title of the paper")
@@ -41,7 +40,6 @@ class SearchResultSource(BaseModel):
     chunk_id: str = Field(..., description="ID of the chunk in the index")
     prov: Optional[List[ProvenanceInfo]] = Field(None, description="Provenance information (page numbers and bounding boxes)")
     chunk_text: Optional[str] = Field(None, description="The actual text content of the chunk")
-
 
 class RAGQueryRequest(BaseModel):
     """Request model for RAG query endpoint."""
@@ -65,15 +63,13 @@ class RAGQueryRequest(BaseModel):
             }
         }
 
-
 class RAGQueryResponse(BaseModel):
     """Response model for RAG query endpoint."""
-    
+    answer: str = Field(..., description="Generated answer with inline source citations (e.g. [1], [2],...)")
     query: str = Field(..., description="The original query")
-    answer: str = Field(..., description="Generated answer with source citations")
-    sources: List[SearchResultSource] = Field(..., description="List of sources used to generate the answer")
     num_sources: int = Field(..., description="Number of sources used")
     model: str = Field(..., description="LLM model used to generate the answer")
+    usage: dict = Field(..., description="Token usage information from the LLM")
     finish_reason: str = Field(..., description="Reason the generation finished")
     
     class Config:
@@ -83,6 +79,7 @@ class RAGQueryResponse(BaseModel):
                 "answer": "The transformer architecture introduced several key innovations [Source 1]...",
                 "sources": [
                     {
+                        "inline_index": 0,
                         "rank": 1,
                         "arxiv_id": "1706.03762",
                         "title": "Attention Is All You Need",
@@ -112,13 +109,16 @@ class RAGQueryResponse(BaseModel):
         }
 
 
+class RAGResponse(BaseModel):
+    """Generic response model for RAG endpoints."""
+    response: str = Field(..., description="Generated response from the LLM, contain inline citation markers (e.g [1], [2])")
+    sources: List[SearchResultSource] = Field(..., description="List of sources used to generate the response")
+
 class AskRequest(BaseModel):
     """Request model for simple Q&A endpoint (no RAG)."""
     
     question: str = Field(..., description="The question to ask the LLM", min_length=1)
     
-
-
 class AskResponse(BaseModel):
     """Response model for simple Q&A endpoint."""
     
