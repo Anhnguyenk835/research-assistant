@@ -31,15 +31,16 @@ class ProvenanceInfo(BaseModel):
 
 class SearchResultSource(BaseModel):
     """Source information from search results."""
-    inline_index: int = Field(..., description="Index of the source in the inline list")
+    inline_index: int = Field(..., description="Index of the source that maps to inline citation marker in the answer")
+    original_source_index: int = Field(..., description="Original index of the source in the given document search results")
     rank: int = Field(..., description="Rank of the source in search results")
     arxiv_id: str = Field(..., description="ArXiv ID of the paper")
+    pdf_url: str = Field(..., description="URL to the PDF of the paper")
     title: str = Field(..., description="Title of the paper")
     section: str = Field(..., description="Section heading where the text was found")
     score: float = Field(..., description="Search relevance score")
-    chunk_id: str = Field(..., description="ID of the chunk in the index")
-    prov: Optional[List[ProvenanceInfo]] = Field(None, description="Provenance information (page numbers and bounding boxes)")
-    chunk_text: Optional[str] = Field(None, description="The actual text content of the chunk")
+    prov: Optional[List[ProvenanceInfo]] = Field(None, description="List of provenance information (page numbers and bounding boxes)")
+    chunk_text: str = Field(..., description="The actual text content of the chunk")
 
 class RAGQueryRequest(BaseModel):
     """Request model for RAG query endpoint."""

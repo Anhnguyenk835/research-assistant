@@ -125,9 +125,9 @@ async def query_rag(
             logger.info(f"Answer generated successfully (model: {rag_result['model']})")
 
             # save the rag result to json for debugging
-            import json
-            with open("rag_result.json", "w") as f:
-                json.dump(rag_result, f, indent=2)
+            # import json
+            # with open("rag_result.json", "w") as f:
+            #     json.dump(rag_result, f, indent=2)
 
         except Exception as e:
             logger.error(f"Failed to generate answer: {e}")

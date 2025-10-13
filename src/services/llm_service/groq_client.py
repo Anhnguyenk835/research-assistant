@@ -3,7 +3,7 @@ from groq import Groq
 from typing import Dict, Any, List, Optional
 
 from config import Settings
-from .prompt import GENERAL_SYSTEM_PROMPT, RAG_SYSTEM_PROMPT, build_rag_prompt, format_search_results_context
+from .prompt import GENERAL_SYSTEM_PROMPT, build_rag_prompt, format_search_results_context
 from schemas.rag.rag_models import RAGResponse
 
 logger = logging.getLogger(__name__)
@@ -112,9 +112,9 @@ class GroqClient:
         try:
 
             # Save search results to json for debugging
-            import json
-            with open("search_results.json", "w") as f:
-                json.dump(search_results, f, indent=2)
+            # import json
+            # with open("search_results.json", "w") as f:
+            #     json.dump(search_results, f, indent=2)
 
             # Build context from search results using the prompt helper function
             context = format_search_results_context(search_results, max_chunks=len(search_results))
